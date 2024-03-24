@@ -1,16 +1,14 @@
-import React, { useState } from "react";
-import axios from "axios"; // Import axios for API calls
+import React, { useState, useEffect } from "react";
+import axios from "axios";
 import CustomerDetailsModal from "./CustomerDetails";
 import ProductDetailsModal from "./ProductDetails";
-import { useEffect } from "react";
-import { getDataById } from "../../../../services/ApiFetch";
+import { addData, getDataById } from "../../../../services/ApiFetch";
 
 const InvoiceCreateForm = () => {
   const [formData, setFormData] = useState({
     totalAmount: "",
     discountPrice: "",
     discountPercentage: "",
-    customerId: "",
     productIds: [],
   });
 
@@ -25,7 +23,6 @@ const InvoiceCreateForm = () => {
   const closeCustomerModal = () => setShowCustomerModal(false);
   const closeProductModal = () => setShowProductModal(false);
 
-
   const fetchCustomer = async () => {
     try {
       const data = await getDataById(`/getCustomerById/${selectedCustomerId}`);
@@ -35,16 +32,22 @@ const InvoiceCreateForm = () => {
     }
   };
 
-  useEffect(()=>{
-    console.log(selectedProducts)
-  },[selectedProducts])
- 
- useEffect(()=>{
-      if(selectedCustomerId!=null){
-        fetchCustomer();
-      }
- },[selectedCustomerId])
- 
+  useEffect(() => {
+    console.log(selectedProducts);
+    const calculateTotalAmount = () => {
+      const total = selectedProducts.reduce((acc, product) => {
+        return acc + parseFloat(product.price);
+      }, 0);
+      setFormData((prevData) => ({ ...prevData, totalAmount: total.toFixed(2) }));
+    };
+    calculateTotalAmount();
+  }, [selectedProducts]);
+
+  useEffect(() => {
+    if (selectedCustomerId != null) {
+      fetchCustomer();
+    }
+  }, [selectedCustomerId]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -56,19 +59,27 @@ const InvoiceCreateForm = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    try {
-      const response = await axios.post("/createInvoice", formData);
-      // Add any additional logic here after successful creation
-    } catch (error) {
-      console.error("Error creating invoice:", error);
+    const buttonClicked = e.nativeEvent.explicitOriginalTarget;
+   
+    if (buttonClicked && buttonClicked.type === 'submit') {
+      try {
+        const productIdsArray = selectedProducts.map((product) => product.id);
+        const updatedFormData = { ...formData, customerId: selectedCustomerId, productIds: productIdsArray };
+        const response = await addData("/createInvoice", updatedFormData);
+        console.log(response);
+      } catch (error) {
+        console.error("Error creating invoice:", error);
+      }
     }
   };
+  
+  
 
   return (
-    <div className="w-1/3 ">
+    <div className="w-1/3">
       <h2 className="text-lg font-bold mb-4">Create Invoice</h2>
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="flex justify-between" >
+        <div className="flex justify-between">
           <button
             onClick={openCustomerModal}
             className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600"
@@ -83,38 +94,27 @@ const InvoiceCreateForm = () => {
           </button>
         </div>
 
-        {/* Customer Details Modal */}
         {showCustomerModal && (
-          <CustomerDetailsModal
-          setSelectedCustomerId={setSelectedCustomerId}
-            closeModal={closeCustomerModal}
-            
-          />
+          <CustomerDetailsModal setSelectedCustomerId={setSelectedCustomerId} closeModal={closeCustomerModal} />
         )}
 
-        {/* Product Details Modal */}
         {showProductModal && (
-          <ProductDetailsModal
-            closeModal={closeProductModal}
-            setSelectedProducts={setSelectedProducts}
-            selectedProducts={selectedProducts}
-          />
+          <ProductDetailsModal closeModal={closeProductModal} setSelectedProducts={setSelectedProducts} selectedProducts={selectedProducts} />
         )}
 
-        {selectedCustomer && <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
-        <h2 className="text-xl font-bold mb-4">Customer Details</h2>
-        <p>Name: {selectedCustomer.name}</p>
-        <p>Email: {selectedCustomer.email}</p>
-        <p>Phone: {selectedCustomer.phone}</p>
-        <p>City: {selectedCustomer.city}</p>
-      </div>}
+        {selectedCustomer && (
+          <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
+            <h2 className="text-xl font-bold mb-4">Customer Details</h2>
+            <p>Name: {selectedCustomer.name}</p>
+            <p>Email: {selectedCustomer.email}</p>
+            <p>Phone: {selectedCustomer.phone}</p>
+            <p>City: {selectedCustomer.city}</p>
+          </div>
+        )}
 
-       {selectedProducts.length > 0 &&
+        {selectedProducts.length > 0 &&
           selectedProducts.map((product) => (
-            <div
-              key={product.id}
-              className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full mb-4"
-            >
+            <div key={product.id} className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full mb-4">
               <h2 className="text-xl font-bold mb-4">Product Details</h2>
               <p>Name: {product.name}</p>
               <p>Description: {product.description}</p>
@@ -122,7 +122,6 @@ const InvoiceCreateForm = () => {
               <p>Category: {product.category}</p>
             </div>
           ))}
-        
 
         <div>
           <label htmlFor="totalAmount" className="block mb-1">
@@ -149,52 +148,6 @@ const InvoiceCreateForm = () => {
             value={formData.discountPrice}
             onChange={handleChange}
             className="border border-gray-300 rounded-lg px-3 py-2 w-full"
-          />
-        </div>
-        <div>
-          <label htmlFor="discountPercentage" className="block mb-1">
-            Discount Percentage
-          </label>
-          <input
-            type="number"
-            id="discountPercentage"
-            name="discountPercentage"
-            value={formData.discountPercentage}
-            onChange={handleChange}
-            className="border border-gray-300 rounded-lg px-3 py-2 w-full"
-          />
-        </div>
-        <div>
-          <label htmlFor="customerId" className="block mb-1">
-            Customer ID
-          </label>
-          <input
-            type="number"
-            id="customerId"
-            name="customerId"
-            value={formData.customerId}
-            onChange={handleChange}
-            className="border border-gray-300 rounded-lg px-3 py-2 w-full"
-            required
-          />
-        </div>
-        <div>
-          <label htmlFor="productIds" className="block mb-1">
-            Product IDs (comma separated)
-          </label>
-          <input
-            type="text"
-            id="productIds"
-            name="productIds"
-            value={formData.productIds.join(",")}
-            onChange={(e) =>
-              setFormData({
-                ...formData,
-                productIds: e.target.value.split(","),
-              })
-            }
-            className="border border-gray-300 rounded-lg px-3 py-2 w-full"
-            required
           />
         </div>
         <div>
