@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
 import CustomerDetailsModal from "./CustomerDetails";
 import ProductDetailsModal from "./ProductDetails";
 import { addData, getDataById } from "../../../../services/ApiFetch";
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 const InvoiceCreateForm = () => {
   const [formData, setFormData] = useState({
-    totalAmount: "",
-    discountPrice: "",
-    discountPercentage: "",
+    totalAmount: 0,
+    discountPrice: null,
+    discountPercentage: null,
     productIds: [],
+    status: null,
   });
 
   const [showCustomerModal, setShowCustomerModal] = useState(false);
@@ -38,10 +40,15 @@ const InvoiceCreateForm = () => {
       const total = selectedProducts.reduce((acc, product) => {
         return acc + parseFloat(product.price);
       }, 0);
-      setFormData((prevData) => ({ ...prevData, totalAmount: total.toFixed(2) }));
+      const discount = parseFloat(formData.discountPrice || 0);
+      const discountedTotal = total - discount;
+      setFormData((prevData) => ({
+        ...prevData,
+        totalAmount: discountedTotal.toFixed(2),
+      }));
     };
     calculateTotalAmount();
-  }, [selectedProducts]);
+  }, [selectedProducts, formData.discountPrice]);
 
   useEffect(() => {
     if (selectedCustomerId != null) {
@@ -59,49 +66,65 @@ const InvoiceCreateForm = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const buttonClicked = e.nativeEvent.explicitOriginalTarget;
-   
-    if (buttonClicked && buttonClicked.type === 'submit') {
-      try {
-        const productIdsArray = selectedProducts.map((product) => product.id);
-        const updatedFormData = { ...formData, customerId: selectedCustomerId, productIds: productIdsArray };
-        const response = await addData("/createInvoice", updatedFormData);
-        console.log(response);
-      } catch (error) {
-        console.error("Error creating invoice:", error);
+    try {
+      const productIdsArray = selectedProducts.map((product) => product.id);
+      const updatedFormData = {
+        ...formData,
+        customerId: selectedCustomerId,
+        productIds: productIdsArray,
+      };
+      const response = await addData("/createInvoice", updatedFormData);
+      if (response) {
+        toast.success(response.message);
+        setFormData({
+          totalAmount: 0,
+          discountPrice: 0,
+          discountPercentage: null,
+          productIds: [],
+          status: null,
+        });
+        setSelectedCustomer(null)
+        setSelectedProducts([])
       }
+    } catch (error) {
+      console.error("Error creating invoice:", error);
     }
   };
-  
   
 
   return (
     <div className="w-1/3">
       <h2 className="text-lg font-bold mb-4">Create Invoice</h2>
+      <div className="flex justify-between">
+        <button
+          onClick={openCustomerModal}
+          className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600"
+        >
+          Show Customers
+        </button>
+        <button
+          onClick={openProductModal}
+          className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600"
+        >
+          Show Products
+        </button>
+      </div>
+
+      {showCustomerModal && (
+        <CustomerDetailsModal
+          setSelectedCustomerId={setSelectedCustomerId}
+          closeModal={closeCustomerModal}
+        />
+      )}
+
+      {showProductModal && (
+        <ProductDetailsModal
+          closeModal={closeProductModal}
+          setSelectedProducts={setSelectedProducts}
+          selectedProducts={selectedProducts}
+        />
+      )}
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="flex justify-between">
-          <button
-            onClick={openCustomerModal}
-            className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600"
-          >
-            Show Customers
-          </button>
-          <button
-            onClick={openProductModal}
-            className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600"
-          >
-            Show Products
-          </button>
-        </div>
-
-        {showCustomerModal && (
-          <CustomerDetailsModal setSelectedCustomerId={setSelectedCustomerId} closeModal={closeCustomerModal} />
-        )}
-
-        {showProductModal && (
-          <ProductDetailsModal closeModal={closeProductModal} setSelectedProducts={setSelectedProducts} selectedProducts={selectedProducts} />
-        )}
-
         {selectedCustomer && (
           <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
             <h2 className="text-xl font-bold mb-4">Customer Details</h2>
@@ -114,7 +137,10 @@ const InvoiceCreateForm = () => {
 
         {selectedProducts.length > 0 &&
           selectedProducts.map((product) => (
-            <div key={product.id} className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full mb-4">
+            <div
+              key={product.id}
+              className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full mb-4"
+            >
               <h2 className="text-xl font-bold mb-4">Product Details</h2>
               <p>Name: {product.name}</p>
               <p>Description: {product.description}</p>
@@ -123,20 +149,6 @@ const InvoiceCreateForm = () => {
             </div>
           ))}
 
-        <div>
-          <label htmlFor="totalAmount" className="block mb-1">
-            Total Amount
-          </label>
-          <input
-            type="number"
-            id="totalAmount"
-            name="totalAmount"
-            value={formData.totalAmount}
-            onChange={handleChange}
-            className="border border-gray-300 rounded-lg px-3 py-2 w-full"
-            required
-          />
-        </div>
         <div>
           <label htmlFor="discountPrice" className="block mb-1">
             Discount Price
@@ -151,6 +163,39 @@ const InvoiceCreateForm = () => {
           />
         </div>
         <div>
+          <label htmlFor="totalAmount" className="block mb-1">
+            Total Amount
+          </label>
+          <input
+            type="number"
+            id="totalAmount"
+            name="totalAmount"
+            value={formData.totalAmount}
+            onChange={handleChange}
+            className="border border-gray-300 rounded-lg px-3 py-2 w-full"
+            required
+          />
+        </div>
+
+        <div>
+          <label htmlFor="status" className="block mb-1">
+            Status
+          </label>
+          <select
+            id="status"
+            name="status"
+            value={formData.status}
+            onChange={handleChange}
+            className="border border-gray-300 rounded-lg px-3 py-2 w-full"
+            required
+          >
+            <option value="">Select Status</option>
+            <option value="paid">Paid</option>
+            <option value="unpaid">Unpaid</option>
+          </select>
+        </div>
+
+        <div>
           <button
             type="submit"
             className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600"
@@ -159,6 +204,7 @@ const InvoiceCreateForm = () => {
           </button>
         </div>
       </form>
+      <ToastContainer />
     </div>
   );
 };
