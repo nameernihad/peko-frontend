@@ -75,6 +75,7 @@ const InvoiceCreateForm = () => {
       };
       const response = await addData("/createInvoice", updatedFormData);
       if (response) {
+        console.log(response)
         toast.success(response.message);
         setFormData({
           totalAmount: 0,
