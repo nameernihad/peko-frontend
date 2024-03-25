@@ -24,7 +24,7 @@ function UserRoute() {
         <Route path="/login" element={IsAuth.Token ? <Home /> : <UserLogin />} />
         <Route path="/verify/:token" element={<VerifyEmail />} />
 
-        <Route element={<SharedLayout  />}>
+        <Route element={IsAuth.Token ?<SharedLayout  />:<UserLogin />}>
           <Route index element={<Dashboard />} />
           <Route path="/Products" element={<ProductTable />} />
           <Route path="/Customers" element={<CustomerTable />} />
